@@ -155,7 +155,7 @@ const LandingPage: React.FC = () => {
       </h1>
 
       <p className="text-md md:text-lg lg:text-xl text-center mb-8 md:mb-10 md:w-[800px]">
-        MoodTube is a tool which uses a YouTube video&apos;s comments and AI to
+        MoodTube is a tool which uses a YouTube video&apos;s comments and machine learning to
         tell you what type of response it&apos;s getting without you having to
         read individual comments. Try it out below.
       </p>
