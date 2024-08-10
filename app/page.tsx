@@ -205,7 +205,7 @@ const LandingPage: React.FC = () => {
         )}
       </div>
 
-      <footer className="bg-gray-800 w-screen fixed bottom-0 text-white py-8">
+      <footer className="bg-black w-screen fixed bottom-0 text-white py-8">
         <div className="text-center">
           <p className="text-md">
             Made By{" "}
