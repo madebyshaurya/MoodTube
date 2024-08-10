@@ -1,18 +1,22 @@
-"use client";
+'use client'
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronRight, Loader2 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Sentiment from "sentiment";
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, Tooltip, Legend, Title, ArcElement } from "chart.js";
+import Image from "next/image";
+import Skeleton from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css"; // Import styles if using the skeleton library
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
 var sentiment = new Sentiment();
 
 const LandingPage: React.FC = () => {
+  const [isFetchingVideos, setIsFetchingVideos] = useState(true);
   const [youtubeLink, setYoutubeLink] = useState("");
   const [loading, setLoading] = useState(false);
   const [sentimentData, setSentimentData] = useState<number[]>([]);
@@ -26,6 +30,10 @@ const LandingPage: React.FC = () => {
     neutral: 0,
   });
   const { toast } = useToast();
+  const [videos, setVideos] = useState<
+    { thumbnail: string; title: string; videoId: string }[]
+  >([]);
+  const pieChartRef = useRef<HTMLDivElement>(null); // Create a ref for the Pie chart container
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setYoutubeLink(e.target.value);
@@ -102,6 +110,9 @@ const LandingPage: React.FC = () => {
           negative: parseFloat(((negativeCount / total) * 100).toFixed(2)),
           neutral: parseFloat(((neutralCount / total) * 100).toFixed(2)),
         });
+
+        // Smooth scroll to the Pie chart container
+        pieChartRef.current?.scrollIntoView({ behavior: "smooth" });
       } catch (error) {
         console.error(error);
         toast({
@@ -117,6 +128,51 @@ const LandingPage: React.FC = () => {
 
     setLoading(false);
   };
+
+  // Fetch popular video thumbnails and titles
+  useEffect(() => {
+    const fetchVideos = async () => {
+      setIsFetchingVideos(true);
+      try {
+        // First, fetch popular videos
+        const popularResponse: any = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?key=${process.env.NEXT_PUBLIC_YOUTUBE_API}&part=snippet&chart=mostPopular&maxResults=20`
+        );
+        const popularResult = await popularResponse.json();
+
+        // Filter and fetch videos with comments enabled
+        const videosWithComments = await Promise.all(
+          popularResult.items.map(async (item: any) => {
+            const commentResponse: any = await fetch(
+              `https://www.googleapis.com/youtube/v3/commentThreads?key=${process.env.NEXT_PUBLIC_YOUTUBE_API}&part=id&videoId=${item.id}&maxResults=1`
+            );
+            const commentResult = await commentResponse.json();
+
+            if (commentResult.items && commentResult.items.length > 0) {
+              return {
+                thumbnail: item.snippet.thumbnails.high.url,
+                title: item.snippet.title,
+                videoId: item.id,
+              };
+            }
+            return null;
+          })
+        );
+
+        // Filter out null values and limit to 5 videos
+        const filteredVideos = videosWithComments
+          .filter((v) => v !== null)
+          .slice(0, 5);
+        setVideos(filteredVideos);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsFetchingVideos(false);
+      }
+    };
+
+    fetchVideos();
+  }, []);
 
   // Data and options for the pie chart
   const pieData = {
@@ -148,6 +204,14 @@ const LandingPage: React.FC = () => {
     },
   };
 
+  const handleThumbnailClick = (videoId: string) => {
+    const selectedLink = `https://www.youtube.com/watch?v=${videoId}`;
+    navigator.clipboard.writeText(selectedLink);
+    toast({
+      description: "Copied link to clipboard",
+    });
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 bg-white text-black">
       <h1 className="text-9xl u md:text-[10rem] xl:text-[12rem] text-center mb-6">
@@ -155,9 +219,9 @@ const LandingPage: React.FC = () => {
       </h1>
 
       <p className="text-md md:text-lg lg:text-xl text-center mb-8 md:mb-10 md:w-[800px]">
-        MoodTube is a tool which uses a YouTube video&apos;s comments and machine learning to
-        tell you what type of response it&apos;s getting without you having to
-        read individual comments. Try it out below.
+        MoodTube is a tool which uses a YouTube video&apos;s comments and
+        machine learning to tell you what type of response it&apos;s getting
+        without you having to read individual comments. Try it out below.
       </p>
 
       <div className="flex flex-col md:flex-row items-center space-y-3 md:space-y-0 md:space-x-3 w-full max-w-xl">
@@ -190,7 +254,7 @@ const LandingPage: React.FC = () => {
       </p>
 
       {/* Display sentiment analysis results */}
-      <div className="mt-8 w-full max-w-xl mb-[200px]">
+      <div className="mt-8 w-full max-w-xl" ref={pieChartRef}>
         {sentimentData.length > 0 && (
           <div className="flex flex-col items-center">
             <h2 className="text-lg font-semibold mb-4">
@@ -203,6 +267,43 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Marquee for YouTube Thumbnails and Titles */}
+      <div className="flex flex-col items-center justify-center mb-[200px]">
+        <h1 className="text-3xl pt-10">Try one of these trending videos</h1>
+
+        <div className="mt-8 w-full overflow-hidden gap-2 flex">
+          {isFetchingVideos
+            ? // Skeleton loading
+              Array(5)
+                .fill(0)
+                .map((_, index) => (
+                  <div key={index} className="flex-shrink-0 w-[200px]">
+                    <Skeleton height={112} width={200} className="mb-2" />
+                    <Skeleton count={2} />
+                  </div>
+                ))
+            : // Actual video thumbnails and titles
+              videos.map((video, index) => (
+                <div
+                  key={index}
+                  className="flex-shrink-0 w-[200px] cursor-pointer"
+                  onClick={() => handleThumbnailClick(video.videoId)}
+                >
+                  <Image
+                    src={video.thumbnail}
+                    alt={`Video thumbnail ${index + 1}`}
+                    width={200}
+                    height={112}
+                    className="rounded-lg mb-2"
+                  />
+                  <p className="text-sm text-center text-black">
+                    {video.title}
+                  </p>
+                </div>
+              ))}
+        </div>
       </div>
 
       <footer className="bg-black w-screen fixed bottom-0 text-white py-8">

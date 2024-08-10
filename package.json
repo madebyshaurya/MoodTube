@@ -20,6 +20,7 @@
     "react": "^18",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18",
+    "react-loading-skeleton": "^3.4.0",
     "sentiment": "^5.0.2",
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7"
