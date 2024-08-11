@@ -1,6 +1,7 @@
-'use client'
+"use client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronRight, Loader2 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
@@ -29,6 +30,7 @@ const LandingPage: React.FC = () => {
     negative: 0,
     neutral: 0,
   });
+  const [sliderValue, setSliderValue] = useState<number>(1000); // State for slider value
   const { toast } = useToast();
   const [videos, setVideos] = useState<
     { thumbnail: string; title: string; videoId: string }[]
@@ -58,7 +60,7 @@ const LandingPage: React.FC = () => {
         let allComments: any[] = [];
         let nextPageToken: string | undefined = undefined;
         const maxResults = 100; // Maximum per page
-        const totalCommentsNeeded = 5000; // Total comments you want to fetch
+        const totalCommentsNeeded = sliderValue; // Use slider value
 
         // Fetch comments with pagination
         do {
@@ -82,13 +84,14 @@ const LandingPage: React.FC = () => {
           }
         } while (nextPageToken && allComments.length < totalCommentsNeeded);
 
-        // Limit to 1000 comments if more are fetched
+        // Limit to slider value if more are fetched
         allComments = allComments.slice(0, totalCommentsNeeded);
 
-        // Randomly select 1000 comments from the fetched comments
+        // Randomly select comments from the fetched comments
         const shuffledComments = allComments.sort(() => Math.random() - 0.5);
         const randomComments = shuffledComments.slice(0, totalCommentsNeeded);
 
+        console.log(randomComments);
         // Analyze sentiment of each comment
         const scores = randomComments.map((comment) => {
           const commentText =
@@ -253,6 +256,23 @@ const LandingPage: React.FC = () => {
         More comments = More accuracy
       </p>
 
+      {/* Slider for adjusting the number of comments */}
+      <div className="mt-8 w-full max-w-xl">
+        <label className="text-lg font-semibold mb-2">
+          Number of Comments to Fetch:
+        </label>
+        <p className="text-gray-400 text-sm pb-4">More comments means more accurate results.</p>
+        <Slider
+          value={[sliderValue]}
+          min={1000}
+          max={5000}
+          step={100}
+          onValueChange={(value) => setSliderValue(value[0])}
+          className="w-full"
+        />
+        <p className="text-center mt-2">{sliderValue} comments</p>
+      </div>
+
       {/* Display sentiment analysis results */}
       <div className="mt-8 w-full max-w-xl" ref={pieChartRef}>
         {sentimentData.length > 0 && (
@@ -271,7 +291,7 @@ const LandingPage: React.FC = () => {
 
       {/* Marquee for YouTube Thumbnails and Titles */}
       <div className="flex flex-col items-center justify-center mb-[200px]">
-        <h1 className="text-3xl pt-10">Try one of these trending videos</h1>
+        <h1 className="md:text-3xl pt-10 text-xl">Try one of these trending videos</h1>
 
         <div className="mt-8 w-full gap-2 flex">
           {isFetchingVideos
