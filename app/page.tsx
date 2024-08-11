@@ -58,7 +58,7 @@ const LandingPage: React.FC = () => {
         let allComments: any[] = [];
         let nextPageToken: string | undefined = undefined;
         const maxResults = 100; // Maximum per page
-        const totalCommentsNeeded = 1000; // Total comments you want to fetch
+        const totalCommentsNeeded = 5000; // Total comments you want to fetch
 
         // Fetch comments with pagination
         do {
@@ -136,7 +136,7 @@ const LandingPage: React.FC = () => {
       try {
         // First, fetch popular videos
         const popularResponse: any = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?key=${process.env.NEXT_PUBLIC_YOUTUBE_API}&part=snippet&chart=mostPopular&maxResults=20`
+          `https://www.googleapis.com/youtube/v3/videos?key=${process.env.NEXT_PUBLIC_YOUTUBE_API}&part=snippet&chart=mostPopular&maxResults=5`
         );
         const popularResult = await popularResponse.json();
 
@@ -273,7 +273,7 @@ const LandingPage: React.FC = () => {
       <div className="flex flex-col items-center justify-center mb-[200px]">
         <h1 className="text-3xl pt-10">Try one of these trending videos</h1>
 
-        <div className="mt-8 w-full overflow-hidden gap-2 flex">
+        <div className="mt-8 w-full gap-2 flex">
           {isFetchingVideos
             ? // Skeleton loading
               Array(5)
