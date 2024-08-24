@@ -14,13 +14,16 @@ import "react-loading-skeleton/dist/skeleton.css"; // Import styles if using the
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
-var sentiment = new Sentiment();
+const sentiment = new Sentiment();
 
 const LandingPage: React.FC = () => {
   const [isFetchingVideos, setIsFetchingVideos] = useState(true);
   const [youtubeLink, setYoutubeLink] = useState("");
   const [loading, setLoading] = useState(false);
   const [sentimentData, setSentimentData] = useState<number[]>([]);
+  const [topComments, setTopComments] = useState<
+    { text: string; score: number }[]
+  >([]);
   const [percentages, setPercentages] = useState<{
     positive: number;
     negative: number;
@@ -30,17 +33,35 @@ const LandingPage: React.FC = () => {
     negative: 0,
     neutral: 0,
   });
-  const [sliderValue, setSliderValue] = useState<number>(1000); // State for slider value
+  const [sliderValue, setSliderValue] = useState<number>(3000); // State for slider value
   const { toast } = useToast();
   const [videos, setVideos] = useState<
     { thumbnail: string; title: string; videoId: string }[]
   >([]);
   const pieChartRef = useRef<HTMLDivElement>(null); // Create a ref for the Pie chart container
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = (e: any) => {
+    const scrollPosition = e.target.scrollLeft;
+    const itemWidth = e.target.offsetWidth;
+    const newIndex = Math.round(scrollPosition / itemWidth);
+    setActiveIndex(newIndex);
+  };
+
+  useEffect(() => {
+    const carousel = document.querySelector(".carousel");
+    if (!carousel) return;
+    carousel.addEventListener("scroll", handleScroll);
+    return () => carousel.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const items = isFetchingVideos ? [...Array(5)] : videos;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setYoutubeLink(e.target.value);
   };
 
+  
   function extractVideoId(url: string) {
     const regExp =
       /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
@@ -51,6 +72,7 @@ const LandingPage: React.FC = () => {
   const handleSubmit = async () => {
     setLoading(true);
     setSentimentData([]); // Clear previous sentiment data
+    setTopComments([]); // Clear previous top comments
     setPercentages({ positive: 0, negative: 0, neutral: 0 }); // Clear previous percentages
 
     const videoId = extractVideoId(youtubeLink);
@@ -97,15 +119,18 @@ const LandingPage: React.FC = () => {
           const commentText =
             comment.snippet.topLevelComment.snippet.textOriginal;
           const result = sentiment.analyze(commentText);
-          return result.score;
+          return { text: commentText, score: result.score };
         });
 
-        setSentimentData(scores); // Update sentiment data state
+        setSentimentData(scores.map((s) => s.score)); // Update sentiment data state
+
+        // Extract top 15 comments to show
+        setTopComments(scores.slice(0, 15)); // Get top 15 comments based on order
 
         // Calculate percentages
         const total = scores.length;
-        const positiveCount = scores.filter((score) => score > 0).length;
-        const negativeCount = scores.filter((score) => score < 0).length;
+        const positiveCount = scores.filter((score) => score.score > 0).length;
+        const negativeCount = scores.filter((score) => score.score < 0).length;
         const neutralCount = total - positiveCount - negativeCount;
 
         setPercentages({
@@ -165,7 +190,7 @@ const LandingPage: React.FC = () => {
         // Filter out null values and limit to 5 videos
         const filteredVideos = videosWithComments
           .filter((v) => v !== null)
-          .slice(0, 5);
+          .slice(0, 4);
         setVideos(filteredVideos);
       } catch (error) {
         console.error(error);
@@ -216,141 +241,192 @@ const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4 bg-white text-black">
-      <h1 className="text-9xl u md:text-[10rem] xl:text-[12rem] text-center mb-6">
-        MoodTube
-      </h1>
+    <>
+      <div className="flex py-20 flex-col items-center justify-center min-h-screen px-4 bg-white text-black">
+        <h1 className="text-9xl u md:text-[10rem] xl:text-[12rem] text-center mb-6">
+          MoodTube
+        </h1>
 
-      <p className="text-md md:text-lg lg:text-xl text-center mb-8 md:mb-10 md:w-[800px]">
-        MoodTube is a tool which uses a YouTube video&apos;s comments and
-        machine learning to tell you what type of response it&apos;s getting
-        without you having to read individual comments. Try it out below.
-      </p>
+        <p className="text-md md:text-lg lg:text-xl text-center mb-8 md:mb-10 md:w-[800px]">
+          MoodTube is a tool which uses a YouTube video&apos;s comments and
+          machine learning to tell you what type of response it&apos;s getting
+          without you having to read individual comments. Try it out below.
+        </p>
 
-      <div className="flex flex-col md:flex-row items-center space-y-3 md:space-y-0 md:space-x-3 w-full max-w-xl">
-        <Input
-          placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-          value={youtubeLink}
-          onChange={handleInputChange}
-          className="w-full px-4 py-2 text-black h-[52px] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
-        <Button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="px-4 py-2 w-full md:w-[200px] h-[52px] flex items-center justify-center group transition-all duration-300"
-        >
-          {loading ? (
-            <Loader2 className="animate-spin" size={20} />
-          ) : (
-            <>
-              Get Analysis
-              <ChevronRight
-                size={20}
-                className="inline group-hover:translate-x-1 transition-all"
-              />
-            </>
-          )}
-        </Button>
-      </div>
-      <p className="text-sm text-gray-400 pt-2">
-        More comments = More accuracy
-      </p>
+        <div className="flex flex-col md:flex-row       items-center justify-center w-full gap-4 mb-8">
+          <Input
+            value={youtubeLink}
+            onChange={handleInputChange}
+            placeholder="Paste a YouTube link here"
+            className="w-full md:w-[400px]"
+          />
+          <Button
+            onClick={handleSubmit}
+            className=""
+            disabled={loading || !youtubeLink}
+          >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Analyze
+            {!loading && <ChevronRight className=" h-4 w-4" />}
+          </Button>
+        </div>
 
-      {/* Slider for adjusting the number of comments */}
-      <div className="mt-8 w-full max-w-xl">
-        <label className="text-lg font-semibold mb-2">
-          Number of Comments to Fetch:
-        </label>
-        <p className="text-gray-400 text-sm pb-4">More comments means more accurate results.</p>
-        <Slider
-          value={[sliderValue]}
-          min={1000}
-          max={5000}
-          step={100}
-          onValueChange={(value) => setSliderValue(value[0])}
-          className="w-full"
-        />
-        <p className="text-center mt-2">{sliderValue} comments</p>
-      </div>
+        <div className="w-full md:w-[600px] mb-6">
+          <label className="block mb-2 text-sm font-medium text-gray-700">
+            Number of Comments to Analyze: {sliderValue}
+          </label>
+          <Slider
+            min={1000}
+            max={10000}
+            step={500}
+            value={[sliderValue]}
+            onValueChange={(value) => setSliderValue(value[0])}
+          />
+        </div>
 
-      {/* Display sentiment analysis results */}
-      <div className="mt-8 w-full max-w-xl" ref={pieChartRef}>
-        {sentimentData.length > 0 && (
-          <div className="flex flex-col items-center">
-            <h2 className="text-lg font-semibold mb-4">
-              Sentiment Analysis Results
-            </h2>
-
-            {/* Pie Chart */}
-            <div className="md:w-[400px] md:h-[400px] w-[300px] h-[300px]">
-              <Pie data={pieData} options={pieOptions} />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Marquee for YouTube Thumbnails and Titles */}
-      <div className="flex flex-col items-center justify-center mb-[200px]">
-        <h1 className="md:text-3xl pt-10 text-xl">Try one of these trending videos</h1>
-
-        <div className="mt-8 w-full gap-2 flex">
-          {isFetchingVideos
-            ? // Skeleton loading
-              Array(5)
-                .fill(0)
-                .map((_, index) => (
-                  <div key={index} className="flex-shrink-0 w-[200px]">
-                    <Skeleton height={112} width={200} className="mb-2" />
-                    <Skeleton count={2} />
-                  </div>
-                ))
-            : // Actual video thumbnails and titles
-              videos.map((video, index) => (
-                <div
-                  key={index}
-                  className="flex-shrink-0 w-[200px] cursor-pointer"
-                  onClick={() => handleThumbnailClick(video.videoId)}
-                >
-                  <Image
-                    src={video.thumbnail}
-                    alt={`Video thumbnail ${index + 1}`}
-                    width={200}
-                    height={112}
-                    className="rounded-lg mb-2"
-                  />
-                  <p className="text-sm text-center text-black">
-                    {video.title}
-                  </p>
+        <h2 className="text-3xl pt-20 font-semibold">
+          Try one of these trending videos
+        </h2>
+        <h2 className="text pb-10 pt-2 text-gray-500">
+          These are some of the most popular and latest videos on YouTube right now.
+        </h2>
+        <div className="w-full">
+          <div className="carousel w-full" id="video-carousel">
+            {[...Array(Math.ceil(items.length / 4))].map((_, pageIndex) => (
+              <div
+                key={pageIndex}
+                id={`page${pageIndex}`}
+                className="carousel-item w-full"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full px-4">
+                  {items
+                    .slice(pageIndex * 4, (pageIndex + 1) * 4)
+                    .map((video, index) => (
+                      <div
+                        key={isFetchingVideos ? index : video.videoId}
+                        className="w-full"
+                      >
+                        {isFetchingVideos ? (
+                          <div>
+                            <Skeleton className="w-full aspect-video rounded-md" />
+                            <Skeleton className="w-full h-5 mt-2" />
+                          </div>
+                        ) : (
+                          <div
+                            className="cursor-pointer"
+                            onClick={() => handleThumbnailClick(video.videoId)}
+                          >
+                            <div className="relative w-full aspect-video">
+                              <Image
+                                src={video.thumbnail}
+                                alt={video.title}
+                                layout="fill"
+                                objectFit="cover"
+                                className="rounded-md shadow-md"
+                              />
+                            </div>
+                            <p className="mt-2 text-sm text-center truncate">
+                              {video.title}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                 </div>
-              ))}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-center w-full py-2 gap-2">
+            {[...Array(Math.ceil(items.length / 4))].map((_, index) => (
+              <a
+                key={index}
+                href={`#page${index}`}
+                className={`btn btn-xs ${
+                  activeIndex === index ? "btn-active" : ""
+                }`}
+                onClick={() => setActiveIndex(index)}
+              >
+                {index + 1}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <div
+          ref={pieChartRef}
+          className={`w-full md:w-[400px] mb-8 ${
+            sentimentData.length == 0 ? "hidden" : ""
+          }`}
+        >
+          <Pie data={pieData} options={pieOptions} />
+        </div>
+
+        <div
+          className={`w-full md:w-[600px] bg-gray-100 rounded-lg p-4 shadow-md ${
+            sentimentData.length == 0 ? "hidden" : ""
+          }`}
+        >
+          <h3 className="text-xl font-semibold mb-4">Top 15 Comments</h3>
+          <ul>
+            {topComments.length > 0 ? (
+              topComments.map((comment, index) => {
+                let sentimentLabel = "";
+                if (comment.score > 0) sentimentLabel = "Positive";
+                else if (comment.score < 0) sentimentLabel = "Negative";
+                else sentimentLabel = "Neutral";
+
+                return (
+                  <li
+                    key={index}
+                    className="mb-3 flex justify-between items-center border-b pb-2"
+                  >
+                    <p className="text-sm">{comment.text}</p>
+                    <span
+                      className={`${
+                        sentimentLabel === "Positive"
+                          ? "text-green-500"
+                          : sentimentLabel === "Negative"
+                          ? "text-red-500"
+                          : "text-gray-500"
+                      } font-semibold text-sm`}
+                    >
+                      {sentimentLabel}
+                    </span>
+                  </li>
+                );
+              })
+            ) : (
+              <p className="text-center text-gray-500">
+                No comments available.
+              </p>
+            )}
+          </ul>
         </div>
       </div>
-
-      <footer className="bg-black w-screen fixed bottom-0 text-white py-8">
-        <div className="text-center">
-          <p className="text-md">
-            Made By{" "}
+      <footer className="footer bg-neutral text-neutral-content items-center p-4">
+        <aside className="grid-flow-col items-center">
+          <p>
+            Made by{" "}
             <a
-              href="https://x.com/madebyshaurya"
+              className="underline"
               target="_blank"
-              className="relative after:absolute after:bg-gray-200 after:bottom-0 after:left-0 after:h-[2px] after:w-full after:origin-bottom-left after:scale-x-100 hover:after:origin-bottom-right hover:after:scale-x-0 after:transition-transform after:ease-in-out after:duration-300 inline cursor-pointer"
+              href="https://x.com/madebyshaurya"
             >
               Shaurya
             </a>
           </p>
-        </div>
-
-        <p className="pt-2 text-sm absolute right-4 bottom-2">
+        </aside>
+        <nav className="grid-flow-col gap-4 md:place-self-center md:justify-self-end">
           <a
             href="https://github.com/madebyshaurya/MoodTube"
+            className="btn btn-ghost btn-sm underline"
             target="_blank"
-            className="relative after:absolute after:bg-gray-200 after:bottom-0 after:left-0 after:h-[2px] after:w-full after:origin-bottom-left after:scale-x-100 hover:after:origin-bottom-right hover:after:scale-x-0 after:transition-transform after:ease-in-out after:duration-300 inline cursor-pointer"
           >
             Source Code on GitHub
           </a>
-        </p>
+        </nav>
       </footer>
-    </div>
+    </>
   );
 };
 
